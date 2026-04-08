@@ -2,22 +2,22 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Cartellone Digitale</title>
+    <title>Cartellone Digitale Interno</title>
     <style>
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; color: white; font-family: sans-serif; overflow: hidden; }
         #schermo { width: 100%; height: 100%; background-size: contain; background-repeat: no-repeat; background-position: center; display: flex; align-items: flex-end; }
-        #barra-testo { width: 100%; background: rgba(0,0,0,0.7); font-size: 35px; text-align: center; padding: 20px; }
-        #debug { position: absolute; top: 0; left: 0; background: rgba(255,0,0,0.5); font-size: 12px; display: block; }
+        #barra-testo { width: 100%; background: rgba(0,0,0,0.7); font-size: 35px; text-align: center; padding: 20px; box-sizing: border-box; }
+        #debug { position: absolute; top: 0; left: 0; background: rgba(255,0,0,0.5); font-size: 12px; display: block; padding: 2px; }
     </style>
 </head>
 <body>
-    <div id="debug">Log: In attesa...</div>
+    <div id="debug">Log: Avvio...</div>
     <div id="schermo">
-        <div id="barra-testo">Caricamento dati...</div>
+        <div id="barra-testo">Caricamento palinsesto...</div>
     </div>
 
     <script>
-        // USO IL TUO LINK TSV
+        // USA IL TUO LINK TSV PUBBLICATO DA GOOGLE FOGLI
         var urlFoglio = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRrZmErsS9XHRJG8Yrb8RmC2bJNL0SFv6fcyA5Zu2tQNw1zNDM3kYxlCx3DB6zjovcGQeKP5X8WnOlK/pub?output=tsv";
 
         function log(msg) {
@@ -26,14 +26,15 @@
 
         function avvia() {
             var xhr = new XMLHttpRequest();
-            xhr.open("GET", urlFoglio + "&nocache=" + new Date().getTime(), true);
+            // Aggiungo un timestamp per evitare che la TV usi dati vecchi in cache
+            xhr.open("GET", urlFoglio + "&t=" + new Date().getTime(), true);
             xhr.onreadystatechange = function() {
                 if (xhr.readyState == 4) {
                     if (xhr.status == 200) {
                         log("Dati ricevuti. Elaborazione...");
                         processa(xhr.responseText);
                     } else {
-                        log("Errore caricamento foglio: " + xhr.status);
+                        log("Errore foglio Google: " + xhr.status + ". Controlla pubblicazione TSV.");
                     }
                 }
             };
@@ -44,12 +45,13 @@
             var righe = testo.split("\n");
             var database = [];
             
-            // Trova location nell'URL
+            // Trova location nell'URL (es: ?location=palestra)
             var urlParams = new URLSearchParams(window.location.search);
             var locCercata = urlParams.get('location');
 
             if(!locCercata) {
-                document.getElementById("barra-testo").innerHTML = "MANCA ?location= NELL'INDIRIZZO";
+                document.getElementById("barra-testo").innerHTML = "ERRORE: MANCA ?location= NELL'INDIRIZZO";
+                log("Manca parametro location nell'URL");
                 return;
             }
             locCercata = locCercata.toLowerCase().trim();
@@ -59,9 +61,16 @@
                 if (col.length >= 2) {
                     var locFila = col[0].trim().toLowerCase();
                     if (locFila == locCercata) {
+                        // PRENDIAMO SOLO IL NOME DEL FILE E PULIAMO DA CARATTERI INVISIBILI
+                        var nomeFile = col[1].trim().replace(/[\r\n]/g, "");
+                        
+                        // Ignoriamo le righe dove il nome file è vuoto
+                        if(nomeFile === "") continue;
+
                         database.push({
-                            img: col[1].trim().replace(/\r/g, ""), // Pulisce il link da caratteri invisibili
+                            img: nomeFile,
                             txt: col[2] ? col[2].trim() : "",
+                            // Durata default 5 secondi se non specificata o errata
                             dur: parseInt(col[3]) || 5000
                         });
                     }
@@ -69,25 +78,26 @@
             }
 
             if (database.length > 0) {
-                log("Trovate " + database.length + " immagini per " + locCercata);
+                log("Palinsesto pronto (" + database.length + " foto) per " + locCercata + ". Avvio ciclo.");
+                document.getElementById("barra-testo").innerHTML = ""; // Pulisce il testo iniziale
                 ciclo(database, 0);
             } else {
-                document.getElementById("barra-testo").innerHTML = "Nessun dato per: " + locCercata;
-                log("Database vuoto per questa location");
+                document.getElementById("barra-testo").innerHTML = "Nessuna foto trovata per: " + locCercata;
+                log("Database vuoto per location: " + locCercata);
             }
         }
 
         function ciclo(lista, indice) {
             var ad = lista[indice];
-            log("Caricamento immagine: " + ad.img);
-            
             var divSchermo = document.getElementById("schermo");
             var divTesto = document.getElementById("barra-testo");
 
-            // Prova a caricare l'immagine
+            log("Mostro foto: " + ad.img);
+            
+            // CARICHIAMO L'IMMAGINE LOCALE (DALLO STESSO DEPOSITO GITHUB)
             divSchermo.style.backgroundImage = "url('" + ad.img + "')";
             
-            if (ad.txt != "") {
+            if (ad.txt && ad.txt !== "") {
                 divTesto.style.display = "block";
                 divTesto.innerHTML = ad.txt;
             } else {
@@ -95,10 +105,14 @@
             }
 
             var prossimo = (indice + 1) % lista.length;
-            setTimeout(function() { ciclo(lista, prossimo); }, ad.dur);
+            
+            // Creiamo un nuovo timer pulito per il prossimo cambio
+            if(ad.durTimer) clearTimeout(ad.durTimer);
+            ad.durTimer = setTimeout(function() { ciclo(lista, prossimo); }, ad.dur);
         }
 
-        avvia();
+        // Avvio dopo 1 secondo per dare tempo alla TV di stabilizzarsi
+        setTimeout(avvia, 1000);
     </script>
 </body>
 </html>
