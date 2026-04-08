@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cartellone Pubblicitario Intelligente</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #000;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+        #ad-container {
+            width: 100%;
+            height: 100%;
+            background-size: cover;
+            background-position: center;
+            transition: background-image 1s ease-in-out;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+        }
+        #ad-text {
+            background: rgba(0, 0, 0, 0.7);
+            padding: 20px;
+            font-size: 30px;
+            text-align: center;
+        }
+    </style>
+</head>
+<meta http-equiv="refresh" content="3600">
+<body>
+
+    <div id="ad-container">
+        <div id="ad-text">Caricamento pubblicità...</div>
+    </div>
+
+    <script>
+        // Questo oggetto simula il tuo server centrale (CMS).
+        // Gestisci da qui tutte le pubblicità per ogni posto.
+        const serverCentrale = {
+            "palestra": [
+                { img: "https://picsum.photos/id/1015/1920/1080", testo: "Sconto del 20% sulle proteine!", durata: 4000 },
+                { img: "https://picsum.photos/id/1058/1920/1080", testo: "Nuovi corsi di Yoga alle 18:00", durata: 4000 }
+            ],
+            "ristorante": [
+                { img: "https://picsum.photos/id/42/1920/1080", testo: "Prova il nostro nuovo menu speciale!", durata: 5000 },
+                { img: "https://picsum.photos/id/292/1920/1080", testo: "Vino in omaggio per i tavoli da 4", durata: 3000 }
+            ],
+            "default": [
+                { img: "https://picsum.photos/id/0/1920/1080", testo: "Pubblicità Generica - Visita il nostro sito!", durata: 4000 }
+            ]
+        };
+
+        // 1. Capire in quale "posto" ci troviamo leggendo l'URL (es: ?location=palestra)
+        const urlParams = new URLSearchParams(window.location.search);
+        let locationAttuale = urlParams.get('location');
+
+        // Se la location non esiste nel database, usa quella di default
+        if (!locationAttuale || !serverCentrale[locationAttuale]) {
+            locationAttuale = "default";
+        }
+
+        // 2. Recupera la lista di pubblicità per questo posto specifico
+        const playlist = serverCentrale[locationAttuale];
+        let indiceAttuale = 0;
+
+        // 3. Funzione per cambiare la pubblicità
+        function cambiaPubblicita() {
+            const ad = playlist[indiceAttuale];
+            
+            document.getElementById('ad-container').style.backgroundImage = `url('${ad.img}')`;
+            document.getElementById('ad-text').innerText = ad.testo;
+
+            // Passa alla prossima pubblicità (o ricomincia)
+            indiceAttuale = (indiceAttuale + 1) % playlist.length;
+
+            // Imposta il timer per la prossima pubblicità in base alla sua durata
+            setTimeout(cambiaPubblicita, ad.durata);
+        }
+
+        // Avvia il cartellone
+        cambiaPubblicita();
+    </script>
+</body>
+</html>
