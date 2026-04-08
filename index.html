@@ -3,92 +3,110 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cartellone Pubblicitario Intelligente</title>
+    <meta http-equiv="refresh" content="3600"> <title>Cartellone Pubblicitario Intelligente</title>
     <style>
-        body, html {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            background-color: #000;
-            overflow: hidden;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            color: white;
-            font-family: Arial, sans-serif;
+        body, html { 
+            margin: 0; padding: 0; width: 100%; height: 100%; 
+            background-color: #000; overflow: hidden; 
+            display: flex; justify-content: center; align-items: center; 
+            color: white; font-family: Arial, sans-serif; 
         }
-        #ad-container {
-            width: 100%;
-            height: 100%;
-            background-size: cover;
-            background-position: center;
-            transition: background-image 1s ease-in-out;
-            display: flex;
-            flex-direction: column;
-            justify-content: flex-end;
+        #ad-container { 
+            width: 100%; height: 100%; 
+            background-size: cover; background-position: center; 
+            transition: background-image 1s ease-in-out; 
+            display: flex; flex-direction: column; justify-content: flex-end; 
         }
-        #ad-text {
-            background: rgba(0, 0, 0, 0.7);
-            padding: 20px;
-            font-size: 30px;
-            text-align: center;
+        #ad-text { 
+            background: rgba(0, 0, 0, 0.7); 
+            padding: 20px; font-size: 30px; text-align: center; 
         }
     </style>
 </head>
-<meta http-equiv="refresh" content="3600">
 <body>
-
     <div id="ad-container">
-        <div id="ad-text">Caricamento pubblicità...</div>
+        <div id="ad-text">Sincronizzazione col database in corso...</div>
     </div>
 
     <script>
-        // Questo oggetto simula il tuo server centrale (CMS).
-        // Gestisci da qui tutte le pubblicità per ogni posto.
-        const serverCentrale = {
-            "palestra": [
-                { img: "https://picsum.photos/id/1015/1920/1080", testo: "Sconto del 20% sulle proteine!", durata: 4000 },
-                { img: "https://picsum.photos/id/1058/1920/1080", testo: "Nuovi corsi di Yoga alle 18:00", durata: 4000 }
-            ],
-            "ristorante": [
-                { img: "https://picsum.photos/id/42/1920/1080", testo: "Prova il nostro nuovo menu speciale!", durata: 5000 },
-                { img: "https://picsum.photos/id/292/1920/1080", testo: "Vino in omaggio per i tavoli da 4", durata: 3000 }
-            ],
-            "default": [
-                { img: "https://picsum.photos/id/0/1920/1080", testo: "Pubblicità Generica - Visita il nostro sito!", durata: 4000 }
-            ]
-        };
+        // =====================================================================
+        // ---> INCOLLA QUI TRA LE VIRGOLETTE IL LINK DEL TUO FOGLIO GOOGLE (.TSV) <---
+        // =====================================================================
+        const linkGoogleFoglio = https://docs.google.com/spreadsheets/d/e/2PACX-1vRrZmErsS9XHRJG8Yrb8RmC2bJNL0SFv6fcyA5Zu2tQNw1zNDM3kYxlCx3DB6zjovcGQeKP5X8WnOlK/pubhtml
 
-        // 1. Capire in quale "posto" ci troviamo leggendo l'URL (es: ?location=palestra)
-        const urlParams = new URLSearchParams(window.location.search);
-        let locationAttuale = urlParams.get('location');
+        async function avviaCartellone() {
+            try {
+                // 1. Scarica i dati da Google Fogli
+                const response = await fetch(linkGoogleFoglio);
+                if (!response.ok) throw new Error("Errore nel download dei dati");
+                const data = await response.text();
+                
+                // 2. Trasforma il testo in un archivio di pubblicità
+                const righe = data.split('\n');
+                const serverCentrale = {};
+                
+                for(let i = 1; i < righe.length; i++) { // Parte da 1 per saltare le intestazioni
+                    if(!righe[i].trim()) continue; // Salta le righe vuote
+                    const colonne = righe[i].split('\t');
+                    
+                    // Assicurati che ci siano le colonne base
+                    if (colonne.length >= 2) {
+                        const location = colonne[0].trim().toLowerCase();
+                        const img = colonne[1].trim();
+                        const testo = colonne[2] ? colonne[2].trim() : "";
+                        const durata = (colonne[3] && parseInt(colonne[3].trim())) ? parseInt(colonne[3].trim()) : 5000; // 5 sec di default
+                        
+                        if(!serverCentrale[location]) { serverCentrale[location] = []; }
+                        serverCentrale[location].push({ img, testo, durata });
+                    }
+                }
 
-        // Se la location non esiste nel database, usa quella di default
-        if (!locationAttuale || !serverCentrale[locationAttuale]) {
-            locationAttuale = "default";
+                // 3. Trova la location nell'URL (es: ?location=scuola)
+                const urlParams = new URLSearchParams(window.location.search);
+                let locationAttuale = urlParams.get('location');
+
+                // Controlli per mostrare messaggi di errore chiari sullo schermo
+                if (!locationAttuale) {
+                    document.getElementById('ad-text').innerText = "Attenzione: Manca la location nell'URL. Aggiungi ?location=nome";
+                    return;
+                }
+
+                locationAttuale = locationAttuale.toLowerCase();
+
+                if (!serverCentrale[locationAttuale]) {
+                    document.getElementById('ad-text').innerText = "Nessuna pubblicità trovata nella riga di: " + locationAttuale;
+                    return;
+                }
+
+                // 4. Riproduci la playlist
+                const playlist = serverCentrale[locationAttuale];
+                let indiceAttuale = 0;
+
+                function cambiaPubblicita() {
+                    const ad = playlist[indiceAttuale];
+                    document.getElementById('ad-container').style.backgroundImage = `url('${ad.img}')`;
+                    
+                    // Mostra o nascondi il testo in base a come hai compilato il foglio
+                    if (ad.testo && ad.testo !== "") {
+                        document.getElementById('ad-text').style.display = "block";
+                        document.getElementById('ad-text').innerText = ad.testo;
+                    } else {
+                        document.getElementById('ad-text').style.display = "none";
+                    }
+
+                    indiceAttuale = (indiceAttuale + 1) % playlist.length;
+                    setTimeout(cambiaPubblicita, ad.durata);
+                }
+
+                cambiaPubblicita();
+
+            } catch (error) {
+                console.error("Errore:", error);
+                document.getElementById('ad-text').innerText = "Errore: controlla di aver inserito il link TSV corretto di Google Fogli.";
+            }
         }
 
-        // 2. Recupera la lista di pubblicità per questo posto specifico
-        const playlist = serverCentrale[locationAttuale];
-        let indiceAttuale = 0;
-
-        // 3. Funzione per cambiare la pubblicità
-        function cambiaPubblicita() {
-            const ad = playlist[indiceAttuale];
-            
-            document.getElementById('ad-container').style.backgroundImage = `url('${ad.img}')`;
-            document.getElementById('ad-text').innerText = ad.testo;
-
-            // Passa alla prossima pubblicità (o ricomincia)
-            indiceAttuale = (indiceAttuale + 1) % playlist.length;
-
-            // Imposta il timer per la prossima pubblicità in base alla sua durata
-            setTimeout(cambiaPubblicita, ad.durata);
-        }
-
-        // Avvia il cartellone
-        cambiaPubblicita();
+        avviaCartellone();
     </script>
 </body>
 </html>
