@@ -2,76 +2,91 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Cartellone</title>
+    <title>Cartellone Digitale</title>
     <style>
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: black; overflow: hidden; }
-        #schermo { 
-            width: 100%; height: 100%; 
-            background-size: contain; background-repeat: no-repeat; background-position: center; 
-            display: flex; align-items: flex-end; 
-        }
-        #barra-testo { 
-            width: 100%; background: rgba(0,0,0,0.8); color: white; 
-            font-family: sans-serif; font-size: 40px; text-align: center; padding: 20px; 
-        }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; color: white; font-family: sans-serif; overflow: hidden; }
+        #schermo { width: 100%; height: 100%; background-size: contain; background-repeat: no-repeat; background-position: center; display: flex; align-items: flex-end; }
+        #barra-testo { width: 100%; background: rgba(0,0,0,0.7); font-size: 35px; text-align: center; padding: 20px; }
+        #debug { position: absolute; top: 0; left: 0; background: rgba(255,0,0,0.5); font-size: 12px; display: block; }
     </style>
 </head>
 <body>
+    <div id="debug">Log: In attesa...</div>
     <div id="schermo">
-        <div id="barra-testo">Inizializzazione...</div>
+        <div id="barra-testo">Caricamento dati...</div>
     </div>
 
     <script>
-        // IL TUO LINK TSV
+        // USO IL TUO LINK TSV
         var urlFoglio = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRrZmErsS9XHRJG8Yrb8RmC2bJNL0SFv6fcyA5Zu2tQNw1zNDM3kYxlCx3DB6zjovcGQeKP5X8WnOlK/pub?output=tsv";
 
-        function caricaDati() {
+        function log(msg) {
+            document.getElementById('debug').innerHTML = msg;
+        }
+
+        function avvia() {
             var xhr = new XMLHttpRequest();
-            xhr.open("GET", urlFoglio + "&t=" + new Date().getTime(), true);
+            xhr.open("GET", urlFoglio + "&nocache=" + new Date().getTime(), true);
             xhr.onreadystatechange = function() {
-                if (xhr.readyState == 4 && xhr.status == 200) {
-                    var righe = xhr.responseText.split("\n");
-                    var pubblicita = [];
-                    
-                    // Prendi la location dall'URL
-                    var locCercata = window.location.search.split("location=")[1];
-                    if(!locCercata) {
-                        document.getElementById("barra-testo").innerHTML = "Errore: scrivi ?location=... nell'indirizzo";
-                        return;
-                    }
-                    locCercata = locCercata.toLowerCase();
-
-                    for (var i = 1; i < righe.length; i++) {
-                        var colonne = righe[i].split("\t");
-                        if (colonne[0].trim().toLowerCase() == locCercata) {
-                            pubblicita.push({
-                                img: colonne[1].trim(),
-                                txt: colonne[2] ? colonne[2].trim() : "",
-                                dur: parseInt(colonne[3]) || 5000
-                            });
-                        }
-                    }
-
-                    if (pubblicita.length > 0) {
-                        avviaCiclo(pubblicita);
+                if (xhr.readyState == 4) {
+                    if (xhr.status == 200) {
+                        log("Dati ricevuti. Elaborazione...");
+                        processa(xhr.responseText);
                     } else {
-                        document.getElementById("barra-testo").innerHTML = "Nessuna riga trovata per: " + locCercata;
+                        log("Errore caricamento foglio: " + xhr.status);
                     }
                 }
             };
             xhr.send();
         }
 
-        var indice = 0;
-        function avviaCiclo(lista) {
+        function processa(testo) {
+            var righe = testo.split("\n");
+            var database = [];
+            
+            // Trova location nell'URL
+            var urlParams = new URLSearchParams(window.location.search);
+            var locCercata = urlParams.get('location');
+
+            if(!locCercata) {
+                document.getElementById("barra-testo").innerHTML = "MANCA ?location= NELL'INDIRIZZO";
+                return;
+            }
+            locCercata = locCercata.toLowerCase().trim();
+
+            for (var i = 1; i < righe.length; i++) {
+                var col = righe[i].split("\t");
+                if (col.length >= 2) {
+                    var locFila = col[0].trim().toLowerCase();
+                    if (locFila == locCercata) {
+                        database.push({
+                            img: col[1].trim().replace(/\r/g, ""), // Pulisce il link da caratteri invisibili
+                            txt: col[2] ? col[2].trim() : "",
+                            dur: parseInt(col[3]) || 5000
+                        });
+                    }
+                }
+            }
+
+            if (database.length > 0) {
+                log("Trovate " + database.length + " immagini per " + locCercata);
+                ciclo(database, 0);
+            } else {
+                document.getElementById("barra-testo").innerHTML = "Nessun dato per: " + locCercata;
+                log("Database vuoto per questa location");
+            }
+        }
+
+        function ciclo(lista, indice) {
             var ad = lista[indice];
+            log("Caricamento immagine: " + ad.img);
+            
             var divSchermo = document.getElementById("schermo");
             var divTesto = document.getElementById("barra-testo");
 
-            // Cambio immagine
+            // Prova a caricare l'immagine
             divSchermo.style.backgroundImage = "url('" + ad.img + "')";
             
-            // Cambio testo
             if (ad.txt != "") {
                 divTesto.style.display = "block";
                 divTesto.innerHTML = ad.txt;
@@ -79,11 +94,11 @@
                 divTesto.style.display = "none";
             }
 
-            indice = (indice + 1) % lista.length;
-            setTimeout(function() { avviaCiclo(lista); }, ad.dur);
+            var prossimo = (indice + 1) % lista.length;
+            setTimeout(function() { ciclo(lista, prossimo); }, ad.dur);
         }
 
-        caricaDati();
+        avvia();
     </script>
 </body>
 </html>
